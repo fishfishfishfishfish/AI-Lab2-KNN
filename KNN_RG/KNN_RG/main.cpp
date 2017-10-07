@@ -10,9 +10,11 @@
 #include <cstring>
 #include <sstream>
 #include <vector>
+#include <stack>
 #include <map>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 using namespace std;
 
 //在 string向量里找出字符串str，返回索引
@@ -29,21 +31,47 @@ int find_word_in_vc(string &str, vector<string> &string_vc)
 class trainRow
 {
 public:
+	int dictSize;
 	bool* onehot;
 	double* emotion;//anger,disgust,fear,joy,sad,surprise
 
 	trainRow();
 	trainRow(int dictSize);
+	trainRow(const trainRow& TR);//带指针数组的类一定要有拷贝构造函数
 	~trainRow();
 };
 trainRow::trainRow()
 {
+	dictSize = 0;
 	emotion = new double[6];
 }
 trainRow::trainRow(int dictSize)
 {
+	this->dictSize = dictSize;
 	onehot = new bool[dictSize];
+	for (int i = 0; i < dictSize; i++)
+	{
+		onehot[i] = false;
+	}
 	emotion = new double[6];
+	for (int i = 0; i < 6; i++)
+	{
+		emotion[i] = 0;
+	}
+}
+trainRow::trainRow(const trainRow& TR)
+{
+	dictSize = TR.dictSize;
+	onehot = new bool[TR.dictSize];
+	for (int i = 0; i < TR.dictSize; i++)
+	{
+		onehot[i] = TR.onehot[i];
+	}
+	emotion = new double[6];
+	for (int i = 0; i < 6; i++)
+	{
+		emotion[i] = TR.emotion[i];
+	}
 }
 trainRow::~trainRow()
 {
@@ -60,9 +88,9 @@ public:
 
 	trainCase();
 	trainCase(const string &filename);
-	~trainCase();
 	void get_words(const string &filename);	//获取wordVC向量,同时充当了构造函数
-	void write_matrix(const string &filename);//获取onehot矩阵，emotions数组 
+	void write_matrix(const string &filename);//获取onehot矩阵，emotions数组
+	friend void operator<<(ostream& os, const trainCase& TC);
 };
 trainCase::trainCase()
 {
@@ -86,7 +114,7 @@ void trainCase::get_words(const string &filename)
 
 		istringstream ss(s);
 		getline(ss, words, ',');//获得单词序列
-		ss.str(words.c_str);
+		ss.str(words.c_str());
 		while (ss >> word)
 		{
 			if (find(wordsVC.begin(), wordsVC.end(), word) == wordsVC.end())//从未出现过的单词 
@@ -110,6 +138,7 @@ void trainCase::write_matrix(const string &filename)
 		string words, word;
 		istringstream ss(s);
 		trainRow* TR = new trainRow(dictSize);
+		//trainRow TR(dictSize);
 		getline(ss, words, ',');//获得单词序列
 		istringstream Wss(words);
 		while (Wss >> word)//获得当前行的记录 
@@ -123,14 +152,178 @@ void trainCase::write_matrix(const string &filename)
 		}
 		for (int i = 0; i < 6; i++)
 		{
-			getline(ss, TR->emotion[i], ',');
+			string tmpEmotion;
+			getline(ss,tmpEmotion, ',');
+			TR->emotion[i] = atof(tmpEmotion.c_str());
 		}
 		matrix.push_back(*TR);
 	}
 }
+void operator<<(ostream& os, const trainCase& TC)
+{
+	for (int i = 0; i < TC.rowCnt; i++)
+	{
+		for (int j = 0; j < TC.dictSize; j++)
+		{
+			os << TC.matrix[i].onehot[j] << ' ';
+		}
+		os << endl;
+		for (int j = 0; j < 6; j++)
+		{
+			os << TC.matrix[i].emotion[j] << ' ';
+		}
+		os << endl;
+	}
+}
 
+class testCase
+{
+public:
+	bool* onehot;//写出test文章的onehot向量
+	int dictSize;//训练集的字典大小
+	vector<int> newWord;//记录测试集里出现的不在字典里的词的数据
+	multimap<double, int> distPairs;//记录测试数据和所有训练数据的距离，first是距离，second是训练数据的索引
+
+	testCase();
+	testCase(int w);
+	testCase(const testCase& TC);
+	~testCase();
+	void getOnehot(const string &words, vector<string> &vc);//得到onehot向量
+	double distCnt(bool *trainRow, int dictSize, double distType);//返回测试数据和摸一个训练数据之间的距离
+	void setDistPairs(int index, double dist);//向distPairs中添加一条距离信息
+	string RG(int k, trainCase& TC);//通过记录的信息和训练集的感情数据对测试数据分类，返回感情
+	void printPairs();
+	void printOnehot();
+};
+testCase::testCase()
+{
+	dictSize = 0;
+	onehot = new bool[dictSize];
+}
+testCase::testCase(int w)
+{
+	dictSize = w;
+	onehot = new bool[dictSize];
+	for (int i = 0; i < dictSize; i++)
+	{
+		onehot[i] = false;
+	}
+}
+testCase::testCase(const testCase& TC)
+{
+	dictSize = TC.dictSize;
+	onehot = new bool[dictSize];
+	for (int i = 0; i < dictSize; i++)
+	{
+		onehot[i] = TC.onehot[i];
+	}
+	newWord = TC.newWord;
+	distPairs = TC.distPairs;
+}
+testCase::~testCase()
+{
+	delete[]onehot;
+}
+
+//得到onehot向量
+void testCase::getOnehot(const string &words, vector<string> &vc)
+{
+	string currWord;
+	istringstream iss(words);
+	while (iss >> currWord)
+	{
+		int location = find_word_in_vc(currWord, vc);
+		if (location != -1)
+		{
+			onehot[location] = true;
+		}
+		else
+		{
+			newWord.push_back(1);
+		}
+	}
+}
+
+//返回测试数据和一个训练数据之间的距离
+double testCase::distCnt(bool *trainRow, int dictSize, double distType)
+{
+	double dist = 0;
+	for (int i = 0; i < dictSize; i++)
+	{
+		dist += pow(trainRow[i] - onehot[i], distType);
+	}
+	for (int i = 0; i < newWord.size(); i++)
+	{
+		dist += pow(0 - newWord[i], distType);
+	}
+
+	dist = pow(dist, 1.0 / distType);
+	return dist;
+}
+
+//向distPairs中添加一条距离信息
+void testCase::setDistPairs(int index, double dist)
+{
+	distPairs.insert(pair<double, int>(dist, index));
+}
+
+//通过记录的信息和训练集的感情数据对测试数据分类，返回感情
+string testCase::RG(int k, trainCase& TC)
+{
+
+	if (k <= distPairs.size())
+	{
+		multimap<double, int>::iterator it = distPairs.begin();
+		for (int i = 0; i < k; i++)
+		{
+			if (emotionsCnt.find(emotions[it->second]) != emotionsCnt.end())
+			{
+				emotionsCnt[emotions[it->second]]++;
+			}
+			else
+			{
+				emotionsCnt[emotions[it->second]] = true;
+			}
+			it++;
+		}
+	}
+
+	//找到前k近数据里出现最多的感情
+	int most_num = 0;
+	string most_emotion = "";
+	for (map<string, int>::iterator iter = emotionsCnt.begin(); iter != emotionsCnt.end(); iter++)
+	{
+		if (iter->second >= most_num)
+		{
+			most_num = iter->second;
+			most_emotion = iter->first;
+		}
+	}
+
+	return most_emotion;
+}
+
+void testCase::printPairs()
+{
+	for (multimap<double, int>::iterator it = distPairs.begin(); it != distPairs.end(); it++)
+	{
+		cout << it->first << '\t' << it->second << endl;
+	}
+}
+
+void testCase::printOnehot()
+{
+	for (int i = 0; i < dictSize; i++)
+	{
+		cout << onehot[i] << ' ';
+	}
+	cout << endl;
+}
 int main()
 {
+	trainCase TC("train_set.csv");
+	ofstream fout("test.txt");
+	fout << TC;
     return 0;
 }
 
