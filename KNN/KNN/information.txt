@@ -1,0 +1,20 @@
+train_set:
+sad：132
+anger：41
+surprise：113
+joy：222
+fear：95
+disgust：20
+
+valid_set：
+sad：65
+anger：21
+surprise：46
+joy：112
+fear：54
+disgust：13
+
+best_result:
+k=14 
+correction=42.1222%
+ps. 选取出现最多的感情时，有多个感情一样多时，选后出现的
