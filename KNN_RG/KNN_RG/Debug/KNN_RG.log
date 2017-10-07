@@ -1,0 +1,8 @@
+﻿  stdafx.cpp
+c:\users\61915\source\repos\ai-lab2-knn\knn_rg\knn_rg\stdafx.cpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+c:\users\61915\source\repos\ai-lab2-knn\knn_rg\knn_rg\stdafx.h : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+c:\users\61915\source\repos\ai-lab2-knn\knn_rg\knn_rg\targetver.h : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  main.cpp
+c:\users\61915\source\repos\ai-lab2-knn\knn_rg\knn_rg\main.cpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  KNN_RG.vcxproj -> C:\Users\61915\source\repos\AI-Lab2-KNN\KNN_RG\Debug\KNN_RG.exe
+  KNN_RG.vcxproj -> C:\Users\61915\source\repos\AI-Lab2-KNN\KNN_RG\Debug\KNN_RG.pdb (Partial PDB)
