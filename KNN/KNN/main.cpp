@@ -237,6 +237,77 @@ void testCase::printOnehot()
 	cout << endl;
 }
 
+double validate(string &filename, trainCase &traincase, int k)
+{
+	ifstream fin(filename);
+
+	string s;
+	int rightCnt = 0;//分类正确的数据数量
+	int testCnt = 0;//总的测试数据数量
+	getline(fin, s);//去掉说明
+	while (getline(fin, s))
+	{
+		string words, ansEmotion;
+		istringstream iss1(s);
+		getline(iss1, words, ',');
+		testCase testcase(traincase.dictSize);
+		testcase.getOnehot(words, traincase.wordsVC);
+		getline(iss1, ansEmotion, '\n');
+		for (int i = 0; i < traincase.rowCnt; i++)
+		{
+			double dist = testcase.distCnt(traincase.onehotMatrix[i], traincase.dictSize, 2);
+			testcase.setDistPairs(i, dist);
+		}
+
+		string res_emotion = testcase.classify(k, traincase.emotions);
+
+		testCnt++;
+		if (res_emotion == ansEmotion)
+		{
+			rightCnt++;
+		}
+
+		cout << res_emotion << endl;
+	}
+
+	return 100.0 * rightCnt / testCnt;
+}
+
+void testing(string &testFilename, string &resFilename, trainCase &traincase, int k)
+{
+	ifstream fin(testFilename);
+	ofstream fout(resFilename);//结果写入的文件
+
+	fout << "textid" << ',' << "label" << endl;
+
+	string s;
+	int rightCnt = 0;//分类正确的数据数量
+	int testCnt = 0;//总的测试数据数量
+	getline(fin, s);//去掉说明 
+	while (getline(fin, s))
+	{
+		string words;
+		istringstream iss2(s);
+		getline(iss2, words, ',');//去掉数字
+		getline(iss2, words, ',');
+
+		testCase testcase(traincase.dictSize);
+		testcase.getOnehot(words, traincase.wordsVC);
+
+		for (int i = 0; i < traincase.rowCnt; i++)
+		{
+			double dist = testcase.distCnt(traincase.onehotMatrix[i], traincase.dictSize, 2);
+			testcase.setDistPairs(i, dist);
+		}
+
+		string res_emotion = testcase.classify(k, traincase.emotions);
+
+		testCnt++;
+
+		cout << res_emotion << endl;
+		fout << testCnt << ',' << res_emotion << endl;
+	}
+}
 int main()
 {
 	//构建训练数据的onehot矩阵
@@ -251,42 +322,20 @@ int main()
 	int k;
 	cin >> k;
 
-	string testFilename = "validation_set.csv";
-	ifstream fin(testFilename);
-	ofstream fout("classify_res.txt");//结果写入的文件
+	string validFilename = "validation_set.csv";
 	
-	string s;
-	int rightCnt = 0;//分类正确的数据数量
-	int testCnt = 0;//总的测试数据数量
-	getline(fin, s);//去掉说明 
-	while (getline(fin, s))
-	{
-		string words, ansEmotion;
-		istringstream iss(s);
-		getline(iss, words, ',');
-		testCase testcase(traincase.dictSize);
-		testcase.getOnehot(words, traincase.wordsVC);
-		getline(iss, ansEmotion, '\n');
-		for (int i = 0; i < traincase.rowCnt; i++)
-		{
-			double dist = testcase.distCnt(traincase.onehotMatrix[i], traincase.dictSize, 2);
-			testcase.setDistPairs(i, dist);
-		}
+	double validation = 0;
+	validation = validate(validFilename, traincase, k);
 
-		string res_emotion = testcase.classify(k, traincase.emotions);
-		
-		testCnt++;
-		if (res_emotion == ansEmotion)
-		{
-			rightCnt++;
-		}
-		
-		cout << res_emotion << endl;
-		fout << res_emotion << endl;
-		//system("pause");
-	}
+	cout << "准确率： " << validation << '%' << endl;
+	system("pause");
 
-	cout << "分类正确率：" << 100.0*rightCnt/testCnt << '%' << endl;
+	//对测试集分类
+	string testFilename = "test_set.csv";
+	string resFilename = "15352049_KNN_classification.csv";
+
+	testing(testFilename, resFilename, traincase, k);
+	cout << "测试数据分类完毕" << endl;
 	system("pause");
 	return 0;
 }
