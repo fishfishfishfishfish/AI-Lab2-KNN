@@ -59,6 +59,30 @@ double variance(double* data, int size)
 	}
 	return res;
 }
+double Maximum(double* data, int size)
+{
+	double max = data[0];
+	for (int i = 1; i < size; i++)
+	{
+		if (data[i] > max)
+		{
+			max = data[i];
+		}
+	}
+	return max;
+}
+double Minimum(double* data, int size)
+{
+	double min = data[0];
+	for (int i = 1; i < size; i++)
+	{
+		if (data[i] < min)
+		{
+			min = data[i];
+		}
+	}
+	return min;
+}
 
 class trainRow
 {
@@ -224,7 +248,9 @@ public:
 	void getOnehot(const string &words, vector<string> &vc);//得到onehot向量
 	double distCnt(bool *trainRow, int dictSize, double distType);//返回测试数据和摸一个训练数据之间的距离
 	void setDistPairs(int index, double dist);//向distPairs中添加一条距离信息
-	double* distNormalize(int k);
+	double* distNormalize1(int k);//standard score
+	double* distNormalize2(int k);
+
 	double* RG(int k, trainCase& TC);//通过记录的信息和训练集的感情数据对测试数据分类，返回感情
 	void printPairs();
 	void printOnehot();
@@ -301,7 +327,7 @@ void testCase::setDistPairs(int index, double dist)
 	distPairs.insert(pair<double, int>(dist, index));
 }
 
-double* testCase::distNormalize(int k)//用后记得delete
+double* testCase::distNormalize1(int k)//用后记得delete
 {
 	//standard score
 	double* res = new double[k];
@@ -322,6 +348,32 @@ double* testCase::distNormalize(int k)//用后记得delete
 		{
 			res[i] = abs(res[i] - m) / sqrt(v);
 		}
+		
+	}
+	return res;
+}
+
+double* testCase::distNormalize2(int k)//用后记得delete
+{
+	//Feature scaling
+	double* res = new double[k];
+	if (k <= distPairs.size())
+	{
+		multimap<double, int>::iterator it = distPairs.begin();
+
+		for (int i = 0; i < k; i++)
+		{
+			res[i] = 1.0 / (1 + it->first);
+			it++;
+		}
+
+		double min = Minimum(res, k);
+		double max = Maximum(res, k);
+
+		for (int i = 0; i < k; i++)
+		{
+			res[i] = (res[i] - min) / (max - min);
+		}
 	}
 	return res;
 }
@@ -334,7 +386,7 @@ double* testCase::RG(int k, trainCase& TC)
 		testEmo[i] = 0;
 	}
 	double* weight = new double[k];
-	weight = distNormalize(k);
+	weight = distNormalize2(k);
 	if (k <= distPairs.size())
 	{
 		multimap<double, int>::iterator it = distPairs.begin();
