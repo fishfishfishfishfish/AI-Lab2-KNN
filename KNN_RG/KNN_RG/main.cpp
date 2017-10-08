@@ -27,6 +27,18 @@ int find_word_in_vc(string &str, vector<string> &string_vc)
 	}
 	return it - string_vc.begin();
 }
+void normalize_6(double* x)
+{
+	double sum = 0;
+	for (int i = 0; i < 6; i++)
+	{
+		sum += x[i];
+	}
+	for (int i = 0; i < 6; i++)
+	{
+		x[i] = x[i] / sum;
+	}
+}
 
 class trainRow
 {
@@ -78,6 +90,7 @@ trainRow::~trainRow()
 	delete[] onehot;
 	delete[] emotion;
 }
+
 class trainCase
 {
 public:
@@ -191,7 +204,7 @@ public:
 	void getOnehot(const string &words, vector<string> &vc);//得到onehot向量
 	double distCnt(bool *trainRow, int dictSize, double distType);//返回测试数据和摸一个训练数据之间的距离
 	void setDistPairs(int index, double dist);//向distPairs中添加一条距离信息
-	string RG(int k, trainCase& TC);//通过记录的信息和训练集的感情数据对测试数据分类，返回感情
+	double* RG(int k, trainCase& TC);//通过记录的信息和训练集的感情数据对测试数据分类，返回感情
 	void printPairs();
 	void printOnehot();
 };
@@ -268,39 +281,41 @@ void testCase::setDistPairs(int index, double dist)
 }
 
 //通过记录的信息和训练集的感情数据对测试数据分类，返回感情
-string testCase::RG(int k, trainCase& TC)
+double* testCase::RG(int k, trainCase& TC)
 {
-
+	double* testEmo = new double[6];//记录测试数据的情绪数据
+	for (int i = 0; i < 6; i++)
+	{
+		testEmo[i] = 0;
+	}
 	if (k <= distPairs.size())
 	{
 		multimap<double, int>::iterator it = distPairs.begin();
+
 		for (int i = 0; i < k; i++)
 		{
-			if (emotionsCnt.find(emotions[it->second]) != emotionsCnt.end())
+			double tempDist = it->first;
+			if (tempDist == 0)
 			{
-				emotionsCnt[emotions[it->second]]++;
+				for (int j = 0; j < 6; j++)
+				{
+					testEmo[j] = TC.matrix[it->second].emotion[j];
+				}
+				break;
 			}
 			else
 			{
-				emotionsCnt[emotions[it->second]] = true;
+				for (int j = 0; j < 6; j++)
+				{
+					testEmo[j] += TC.matrix[it->second].emotion[j] / tempDist;
+				}
 			}
+			
 			it++;
 		}
+		normalize_6(testEmo);
 	}
-
-	//找到前k近数据里出现最多的感情
-	int most_num = 0;
-	string most_emotion = "";
-	for (map<string, int>::iterator iter = emotionsCnt.begin(); iter != emotionsCnt.end(); iter++)
-	{
-		if (iter->second >= most_num)
-		{
-			most_num = iter->second;
-			most_emotion = iter->first;
-		}
-	}
-
-	return most_emotion;
+	return testEmo;	
 }
 
 void testCase::printPairs()
@@ -319,11 +334,55 @@ void testCase::printOnehot()
 	}
 	cout << endl;
 }
-int main()
+
+void validHandle(ostream &os, const string &infilename, trainCase &traincase, int k)
+{
+	ifstream fin(infilename);
+	string s;
+	int testCnt = 0;//总的测试数据数量
+	getline(fin, s);//去掉说明
+	while (getline(fin, s))
+	{
+		string words;
+		double* ansEmotion;
+		istringstream iss1(s);
+		getline(iss1, words, ',');
+
+		testCase testcase(traincase.dictSize);
+		testcase.getOnehot(words, traincase.wordsVC);
+
+		for (int i = 0; i < traincase.rowCnt; i++)
+		{
+			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, 2);
+			testcase.setDistPairs(i, dist);
+		}
+
+		ansEmotion = testcase.RG(k, traincase);
+
+		for (int i = 0; i < 6; i++)
+		{
+			os << ansEmotion[i] << '\t';
+		}
+		os << endl;
+		delete[] ansEmotion;
+		//system("pause");
+	}
+}
+
+int main() 
 {
 	trainCase TC("train_set.csv");
-	ofstream fout("test.txt");
-	fout << TC;
-    return 0;
+	string validfile = "validation_set.csv";
+	int k;
+	cout << "k? ";
+	while (cin >> k)
+	{
+		ofstream fout("validation.txt");
+		validHandle(fout, validfile, TC, k);
+		system("pause");
+		cout << "k?";
+	}
+	
+	return 0;
 }
 
