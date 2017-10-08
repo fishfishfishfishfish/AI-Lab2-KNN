@@ -39,6 +39,26 @@ void normalize_6(double* x)
 		x[i] = x[i] / sum;
 	}
 }
+double mean(double* data, int size)
+{
+	double res = 0;
+	for (int i = 0; i < size; i++)
+	{
+		res += data[i];
+	}
+	res = res / size;
+	return res;
+}
+double variance(double* data, int size)
+{
+	double m = mean(data, size);
+	double res = 0;
+	for (int i = 0; i < size; i++)
+	{
+		res += pow(data[i] - m, 2);
+	}
+	return res;
+}
 
 class trainRow
 {
@@ -204,6 +224,7 @@ public:
 	void getOnehot(const string &words, vector<string> &vc);//得到onehot向量
 	double distCnt(bool *trainRow, int dictSize, double distType);//返回测试数据和摸一个训练数据之间的距离
 	void setDistPairs(int index, double dist);//向distPairs中添加一条距离信息
+	double* distNormalize(int k);
 	double* RG(int k, trainCase& TC);//通过记录的信息和训练集的感情数据对测试数据分类，返回感情
 	void printPairs();
 	void printOnehot();
@@ -280,6 +301,30 @@ void testCase::setDistPairs(int index, double dist)
 	distPairs.insert(pair<double, int>(dist, index));
 }
 
+double* testCase::distNormalize(int k)//用后记得delete
+{
+	//standard score
+	double* res = new double[k];
+	if (k <= distPairs.size())
+	{
+		multimap<double, int>::iterator it = distPairs.begin();
+
+		for (int i = 0; i < k; i++)
+		{
+			res[i] = 1.0/(1+it->first);
+			it++;
+		}
+
+		double m = mean(res, k);
+		double v = variance(res, k);
+
+		for (int i = 0; i < k; i++)
+		{
+			res[i] = abs(res[i] - m) / sqrt(v);
+		}
+	}
+	return res;
+}
 //通过记录的信息和训练集的感情数据对测试数据分类，返回感情
 double* testCase::RG(int k, trainCase& TC)
 {
@@ -288,33 +333,24 @@ double* testCase::RG(int k, trainCase& TC)
 	{
 		testEmo[i] = 0;
 	}
+	double* weight = new double[k];
+	weight = distNormalize(k);
 	if (k <= distPairs.size())
 	{
 		multimap<double, int>::iterator it = distPairs.begin();
 
 		for (int i = 0; i < k; i++)
 		{
-			double tempDist = it->first;
-			if (tempDist == 0)
+			for (int j = 0; j < 6; j++)
 			{
-				for (int j = 0; j < 6; j++)
-				{
-					testEmo[j] = TC.matrix[it->second].emotion[j];
-				}
-				break;
-			}
-			else
-			{
-				for (int j = 0; j < 6; j++)
-				{
-					testEmo[j] += TC.matrix[it->second].emotion[j] / tempDist;
-				}
-			}
+				testEmo[j] += TC.matrix[it->second].emotion[j]*weight[i];
+			}	
 			
 			it++;
 		}
 		normalize_6(testEmo);
 	}
+	delete[] weight;
 	return testEmo;	
 }
 
@@ -325,7 +361,6 @@ void testCase::printPairs()
 		cout << it->first << '\t' << it->second << endl;
 	}
 }
-
 void testCase::printOnehot()
 {
 	for (int i = 0; i < dictSize; i++)
@@ -357,6 +392,7 @@ void validHandle(ostream &os, const string &infilename, trainCase &traincase, in
 			testcase.setDistPairs(i, dist);
 		}
 
+		//testcase.printPairs();//debug
 		ansEmotion = testcase.RG(k, traincase);
 
 		for (int i = 0; i < 6; i++)
@@ -373,16 +409,25 @@ int main()
 {
 	trainCase TC("train_set.csv");
 	string validfile = "validation_set.csv";
-	int k;
-	cout << "k? ";
-	while (cin >> k)
+	int start, end;
+	cout << "start?" << endl;
+	cin >> start;
+	cout << "end?" << endl;
+	cin >> end;
+	for (int k = start; k < end; k++)
 	{
-		ofstream fout("validation.txt");
+		string resfile;
+		stringstream ss;
+		ss << "fv";
+		ss << k;
+		ss << ".txt";
+		ss >> resfile;
+		ofstream fout(resfile);
 		validHandle(fout, validfile, TC, k);
-		system("pause");
-		cout << "k?";
+		cout << "k=" << k << "finished" << endl;
 	}
 	
+	system("pause");
 	return 0;
 }
 
