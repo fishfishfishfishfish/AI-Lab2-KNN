@@ -57,7 +57,7 @@ double variance(double* data, int size)
 	{
 		res += pow(data[i] - m, 2);
 	}
-	return res;
+	return res/size;
 }
 double Maximum(double* data, int size)
 {
@@ -423,7 +423,7 @@ double* testCase::RG(int k, trainCase& TC)
 		testEmo[i] = 0;
 	}
 	double* weight = new double[k];
-	weight = cosNormalize(k);
+	weight = distNormalize1(k);
 	if (k <= distPairs.size())
 	{
 		multimap<double, int>::iterator it = distPairs.begin();
@@ -460,7 +460,6 @@ void testCase::printOnehot()
 }
 
 void validHandle(ostream &os, const string &infilename, trainCase &traincase, int k)
-
 {
 	ifstream fin(infilename);
 	string s;
@@ -478,7 +477,7 @@ void validHandle(ostream &os, const string &infilename, trainCase &traincase, in
 
 		for (int i = 0; i < traincase.rowCnt; i++)
 		{
-			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, -1);
+			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, 2);
 			testcase.setDistPairs(i, dist);
 		}
 
@@ -494,11 +493,50 @@ void validHandle(ostream &os, const string &infilename, trainCase &traincase, in
 		//system("pause");
 	}
 }
+void testHandle(ostream &os, const string &infilename, trainCase &traincase, int k)
+{
+	ifstream fin(infilename);
+	string s;
+	int RowCnt = 1;
+	int testCnt = 0;//总的测试数据数量
+	getline(fin, s);//去掉说明
+	os << "textid,anger,disgust,fear,joy,sad,surprise" << endl;//输出说明
+	while (getline(fin, s))
+	{
+		string words;
+		double* ansEmotion;
+		istringstream iss1(s);
+		getline(iss1, words, ',');//去掉数字
+		getline(iss1, words, ',');
 
-int main() 
+		testCase testcase(traincase.dictSize);
+		testcase.getOnehot(words, traincase.wordsVC);
+
+		for (int i = 0; i < traincase.rowCnt; i++)
+		{
+			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, 2);
+			testcase.setDistPairs(i, dist);
+		}
+
+		ansEmotion = testcase.RG(k, traincase);
+
+		os << RowCnt;
+		for (int i = 0; i < 6; i++)
+		{
+			os << ',' << ansEmotion[i];
+		}
+		os << endl;
+		delete[] ansEmotion;
+		//system("pause");
+	}
+}
+
+int main()
 {
 	trainCase TC("train_set.csv");
 	string validfile = "validation_set.csv";
+	string testfile = "test_set.csv";
+
 	int start, end;
 	cout << "start?" << endl;
 	cin >> start;
@@ -507,17 +545,21 @@ int main()
 	for (int k = start; k < end; k++)
 	{
 		string resfile;
-		stringstream ss;
+		/*计算验证*/
+		/*stringstream ss;
 		ss << "fv";
 		ss << k;
 		ss << ".txt";
 		ss >> resfile;
 		ofstream fout(resfile);
-		validHandle(fout, validfile, TC, k);
+		validHandle(fout, validfile, TC, k);*/
+		/*计算测试*/
+		resfile = "15352049_KNN_regression.csv";
+		ofstream fout(resfile);
+		testHandle(fout, testfile, TC, k);
 		cout << "k=" << k << "finished" << endl;
 	}
-	
+
 	system("pause");
 	return 0;
 }
-
