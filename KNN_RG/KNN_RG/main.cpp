@@ -249,7 +249,8 @@ public:
 	double distCnt(bool *trainRow, int dictSize, double distType);//返回测试数据和摸一个训练数据之间的距离
 	void setDistPairs(int index, double dist);//向distPairs中添加一条距离信息
 	double* distNormalize1(int k);//standard score
-	double* distNormalize2(int k);
+	double* distNormalize2(int k);//feature scaling
+	double* cosNormalize(int k);//余弦相似度的归一化
 
 	double* RG(int k, trainCase& TC);//通过记录的信息和训练集的感情数据对测试数据分类，返回感情
 	void printPairs();
@@ -304,20 +305,40 @@ void testCase::getOnehot(const string &words, vector<string> &vc)
 	}
 }
 
-//返回测试数据和一个训练数据之间的距离
+//返回测试数据和一个训练数据之间的距离,-1为余弦相似度
 double testCase::distCnt(bool *trainRow, int dictSize, double distType)
 {
 	double dist = 0;
-	for (int i = 0; i < dictSize; i++)
-	{
-		dist += pow(trainRow[i] - onehot[i], distType);
-	}
-	for (int i = 0; i < newWord.size(); i++)
-	{
-		dist += pow(0 - newWord[i], distType);
-	}
+	if (distType != -1)
+	{		
+		for (int i = 0; i < dictSize; i++)
+		{
+			dist += pow(trainRow[i] - onehot[i], distType);
+		}
+		for (int i = 0; i < newWord.size(); i++)
+		{
+			dist += pow(0 - newWord[i], distType);
+		}
 
-	dist = pow(dist, 1.0 / distType);
+		dist = pow(dist, 1.0 / distType);
+	}
+	else
+	{
+		double absTrain = 0;
+		double absTest = 0;
+		for (int i = 0; i < dictSize; i++)
+		{
+			absTrain += pow(trainRow[i], 2);
+			absTest += pow(onehot[i], 2);
+			dist += trainRow[i] * onehot[i];
+		}
+		for (int i = 0; i < newWord.size(); i++)
+		{
+			absTest += pow(newWord[i], 2);
+		}
+		dist = dist / (sqrt(absTest)*sqrt(absTrain));//越小越不相似，为了和其他距离统一，取其负值
+		dist = -dist;
+	}
 	return dist;
 }
 
@@ -377,6 +398,22 @@ double* testCase::distNormalize2(int k)//用后记得delete
 	}
 	return res;
 }
+double* testCase::cosNormalize(int k)//用后记得delete
+{
+	//归一化余弦相似度
+	double* res = new double[k];
+	if (k <= distPairs.size())
+	{
+		multimap<double, int>::iterator it = distPairs.begin();
+
+		for (int i = 0; i < k; i++)
+		{
+			res[i] = 0.5+0.5*it->first;
+			it++;
+		}
+	}
+	return res;
+}
 //通过记录的信息和训练集的感情数据对测试数据分类，返回感情
 double* testCase::RG(int k, trainCase& TC)
 {
@@ -386,7 +423,7 @@ double* testCase::RG(int k, trainCase& TC)
 		testEmo[i] = 0;
 	}
 	double* weight = new double[k];
-	weight = distNormalize2(k);
+	weight = cosNormalize(k);
 	if (k <= distPairs.size())
 	{
 		multimap<double, int>::iterator it = distPairs.begin();
@@ -423,6 +460,7 @@ void testCase::printOnehot()
 }
 
 void validHandle(ostream &os, const string &infilename, trainCase &traincase, int k)
+
 {
 	ifstream fin(infilename);
 	string s;
@@ -440,7 +478,7 @@ void validHandle(ostream &os, const string &infilename, trainCase &traincase, in
 
 		for (int i = 0; i < traincase.rowCnt; i++)
 		{
-			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, 2);
+			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, -1);
 			testcase.setDistPairs(i, dist);
 		}
 
