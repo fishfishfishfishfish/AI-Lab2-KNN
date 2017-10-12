@@ -163,17 +163,37 @@ void testCase::getOnehot(const string &words, const vector<string> &vc)
 //返回测试数据和摸一个训练数据之间的距离
 double testCase::distCnt(bool *trainRow, int dictSize, double distType)
 {
-	double dist=0;
-	for (int i = 0; i < dictSize; i++)
+	double dist = 0;
+	if (distType != -1)
 	{
-		dist += pow(trainRow[i] - onehot[i], distType);
-	}
-	for (int i = 0; i < newWord; i++)
-	{
-		dist += pow(0 - 1, distType);
-	}
+		for (int i = 0; i < dictSize; i++)
+		{
+			dist += pow(trainRow[i] - onehot[i], distType);
+		}
+		for (int i = 0; i < newWord; i++)
+		{
+			dist += pow(0 - 1, distType);
+		}
 
-	dist = pow(dist, 1 / distType);
+		dist = pow(dist, 1.0 / distType);
+	}
+	else
+	{
+		double absTrain = 0;
+		double absTest = 0;
+		for (int i = 0; i < dictSize; i++)
+		{
+			absTrain += pow(trainRow[i], 2);
+			absTest += pow(onehot[i], 2);
+			dist += trainRow[i] * onehot[i];
+		}
+		for (int i = 0; i < newWord; i++)
+		{
+			absTest += pow(0-1, 2);
+		}
+		dist = dist / (sqrt(absTest)*sqrt(absTrain));//越小越不相似，为了和其他距离统一，之后不用取倒数
+		dist = -dist;
+	}
 	return dist;
 }
 
@@ -255,7 +275,7 @@ double validate(string &filename, trainCase &traincase, int k)
 		getline(iss1, ansEmotion, '\n');
 		for (int i = 0; i < traincase.rowCnt; i++)
 		{
-			double dist = testcase.distCnt(traincase.onehotMatrix[i], traincase.dictSize, 2);
+			double dist = testcase.distCnt(traincase.onehotMatrix[i], traincase.dictSize, -1);
 			testcase.setDistPairs(i, dist);
 		}
 
@@ -296,7 +316,7 @@ void testing(string &testFilename, string &resFilename, trainCase &traincase, in
 
 		for (int i = 0; i < traincase.rowCnt; i++)
 		{
-			double dist = testcase.distCnt(traincase.onehotMatrix[i], traincase.dictSize, 2);
+			double dist = testcase.distCnt(traincase.onehotMatrix[i], traincase.dictSize, -1);
 			testcase.setDistPairs(i, dist);
 		}
 
@@ -319,22 +339,35 @@ int main()
 
 	//对验证集数据进行分类
 	cout << "请输入k值" << endl;
-	int k;
-	cin >> k;
+	int start, end;
+	cout << "start?\n";
+	cin >> start;
+	cout << "end\n";
+	cin >> end;
 
 	string validFilename = "validation_set.csv";
-	
-	double validation = 0;
-	validation = validate(validFilename, traincase, k);
+	double max = 0;
+	double maxk = 0;
+	for (int k = start; k < end; k++)
+	{
+		double validation = 0;
+		validation = validate(validFilename, traincase, k);
 
-	cout << "准确率： " << validation << '%' << endl;
+		cout << "k=" << k << " 准确率： " << validation << '%' << endl;
+		if (validation > max)
+		{
+			max = validation;
+			maxk = k;
+		}
+	}
+	cout << "the highest validation reach " << max << " in k = " << maxk << endl;
 	system("pause");
 
 	//对测试集分类
 	string testFilename = "test_set.csv";
 	string resFilename = "15352049_KNN_classification.csv";
 
-	testing(testFilename, resFilename, traincase, k);
+	testing(testFilename, resFilename, traincase, maxk);
 	cout << "测试数据分类完毕" << endl;
 	system("pause");
 	return 0;

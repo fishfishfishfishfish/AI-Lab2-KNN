@@ -2,5 +2,6 @@
 c:\users\61915\source\repos\ai-lab2-knn\knn\knn\main.cpp(61): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据
 c:\users\61915\source\repos\ai-lab2-knn\knn\knn\main.cpp(78): warning C4244: “return”: 从“__int64”转换到“int”，可能丢失数据
 c:\users\61915\source\repos\ai-lab2-knn\knn\knn\main.cpp(153): warning C4244: “初始化”: 从“__int64”转换到“int”，可能丢失数据
+c:\users\61915\source\repos\ai-lab2-knn\knn\knn\main.cpp(370): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
   KNN.vcxproj -> C:\Users\61915\source\repos\AI-Lab2-KNN\KNN\x64\Debug\KNN.exe
   KNN.vcxproj -> C:\Users\61915\source\repos\AI-Lab2-KNN\KNN\x64\Debug\KNN.pdb (Partial PDB)
