@@ -2,7 +2,6 @@
 //
 
 #include "stdafx.h"
-#include "stdafx.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -91,8 +90,7 @@ class trainRow
 public:
 	int number_of_words;
 	int dictSize;
-	bool* onehot;
-	double* TF;
+	double* data;
 	double* emotion;//anger,disgust,fear,joy,sad,surprise
 
 	trainRow();
@@ -109,12 +107,10 @@ trainRow::trainRow()
 trainRow::trainRow(int dictSize)
 {
 	this->dictSize = dictSize;
-	onehot = new bool[dictSize];
-	TF = new double[dictSize];
+	data = new double[dictSize];
 	for (int i = 0; i < dictSize; i++)
 	{
-		onehot[i] = false;
-		TF[i] = 0;
+		data[i] = 0;
 	}
 	emotion = new double[6];
 	for (int i = 0; i < 6; i++)
@@ -125,12 +121,10 @@ trainRow::trainRow(int dictSize)
 trainRow::trainRow(const trainRow& TR)
 {
 	dictSize = TR.dictSize;
-	onehot = new bool[TR.dictSize];
-	TF = new double[TR.dictSize];
+	data = new double[TR.dictSize];
 	for (int i = 0; i < TR.dictSize; i++)
 	{
-		onehot[i] = TR.onehot[i];
-		TF[i] = TR.TF[i];
+		data[i] = TR.data[i];
 	}
 	emotion = new double[6];
 	for (int i = 0; i < 6; i++)
@@ -140,8 +134,7 @@ trainRow::trainRow(const trainRow& TR)
 }
 trainRow::~trainRow()
 {
-	delete[] onehot;
-	delete[] TF;
+	delete[] data;
 	delete[] emotion;
 }
 
@@ -151,22 +144,31 @@ public:
 	int dictSize;			//不重复记录单词数，矩阵的列数 
 	int rowCnt;				//一共多少训练用的文章，矩阵的行数 
 	vector<string> wordsVC;	//不重复记录单词 
-	vector<trainRow> matrix;//onehot矩阵 TF矩阵 感情向量
+	vector<trainRow*> matrix;//onehot矩阵 TF矩阵 感情向量
 
 	trainCase();
-	trainCase(const string &filename);
+	trainCase(const string &filename, int matrix_type);
+	~trainCase();
 	void get_words(const string &filename);	//获取wordVC向量,同时充当了构造函数
-	void write_matrix(const string &filename);//获取onehot矩阵，emotions数组
+	void write_matrix(const string &filename, int matrix_type);//获取onehot矩阵，emotions数组
 	friend void operator<<(ostream& os, const trainCase& TC);
 };
 trainCase::trainCase()
 {
 	dictSize = rowCnt = 0;
 }
-trainCase::trainCase(const string &filename)
+trainCase::trainCase(const string &filename, int matrix_type)
 {
 	get_words(filename);//Initialize dictSize/rowCnt/wordsVC
-	write_matrix(filename);//Initialize matrix
+	write_matrix(filename, matrix_type);//Initialize matrix
+}
+trainCase::~trainCase()
+{
+	for (int i = 0; i < matrix.size(); i++)
+	{
+		delete matrix[i];
+	}
+	delete &matrix;
 }
 void trainCase::get_words(const string &filename)
 {
@@ -193,11 +195,11 @@ void trainCase::get_words(const string &filename)
 			}
 		}
 		TR->number_of_words = wordCnt;
-		matrix.push_back(*TR);
+		matrix.push_back(TR);
 	}
 	dictSize = wordsVC.size();
 }
-void trainCase::write_matrix(const string &filename)
+void trainCase::write_matrix(const string &filename, int matrix_type)
 {
 	//打开要读的文件 
 	ifstream fin(filename);
@@ -207,9 +209,17 @@ void trainCase::write_matrix(const string &filename)
 	getline(fin, s);//去掉说明 
 	while (getline(fin, s))
 	{
-		matrix[currRow].dictSize = dictSize;
-		matrix[currRow].onehot = new bool[dictSize];
-		matrix[currRow].TF = new double[dictSize];
+		matrix[currRow]->dictSize = dictSize;
+		matrix[currRow]->data = new double[dictSize];
+		for (int i = 0; i < dictSize; i++)
+		{
+			matrix[currRow]->data[i] = 0;
+		}
+
+		double standby = 0;
+		if (matrix_type == 0) { standby = 1; }
+		else { standby = 1.0 / matrix[currRow]->number_of_words; }
+
 		string words, word;
 		istringstream ss(s);
 		getline(ss, words, ',');//获得单词序列
@@ -220,15 +230,14 @@ void trainCase::write_matrix(const string &filename)
 			int location = find_word_in_vc(word, wordsVC);
 			if (location != -1)
 			{
-				matrix[currRow].onehot[location] = true;
-				matrix[currRow].TF[location] = 1.0 / matrix[currRow].number_of_words;
+				matrix[currRow]->data[location] = standby;
 			}
 		}
 		for (int i = 0; i < 6; i++)
 		{
 			string tmpEmotion;
 			getline(ss,tmpEmotion, ',');
-			matrix[currRow].emotion[i] = atof(tmpEmotion.c_str());
+			matrix[currRow]->emotion[i] = atof(tmpEmotion.c_str());
 		}
 		currRow++;
 	}
@@ -239,17 +248,12 @@ void operator<<(ostream& os, const trainCase& TC)
 	{
 		for (int j = 0; j < TC.dictSize; j++)
 		{
-			os << TC.matrix[i].onehot[j] << ' ';
-		}
-		os << endl;
-		for (int j = 0; j < TC.dictSize; j++)
-		{
-			os << TC.matrix[i].TF[j] << ' ';
+			os << TC.matrix[i]->data[j] << ' ';
 		}
 		os << endl;
 		for (int j = 0; j < 6; j++)
 		{
-			os << TC.matrix[i].emotion[j] << ' ';
+			os << TC.matrix[i]->emotion[j] << ' ';
 		}
 		os << endl;
 	}
@@ -265,11 +269,11 @@ public:
 	multimap<double, int> distPairs;//记录测试数据和所有训练数据的距离，first是距离，second是训练数据的索引
 
 	testCase();
-	testCase(int w);
+	testCase(const string &words, int w);
 	testCase(const testCase& TC);
 	~testCase();
 	void getVectors(const string &words, vector<string> &vc, int type);//得到onehot向量
-	double distCnt(bool *trainRow, int dictSize, double distType);//返回测试数据和摸一个训练数据之间的距离
+	double distCnt(double *trainRow, int dictSize, double distType);//返回测试数据和摸一个训练数据之间的距离
 	void setDistPairs(int index, double dist);//向distPairs中添加一条距离信息
 	double* distNormalize1(int k);//standard score
 	double* distNormalize2(int k);//feature scaling
@@ -282,16 +286,23 @@ public:
 };
 testCase::testCase()
 {
-	dictSize = 0;
+	number_of_words = dictSize = 0;
 	data = new double[dictSize];
 }
-testCase::testCase(int w)
+testCase::testCase(const string &words, int w)
 {
 	dictSize = w;
 	data = new double[dictSize];
 	for (int i = 0; i < dictSize; i++)
 	{
 		data[i] = 0;
+	}
+	number_of_words = 0;
+	string tempword;
+	istringstream iss(words);
+	while (iss >> tempword)
+	{
+		number_of_words++;
 	}
 }
 testCase::testCase(const testCase& TC)
@@ -311,7 +322,7 @@ testCase::~testCase()
 	delete[]data;
 }
 
-//得到onehot向量
+//得到onehot，TF向量
 void testCase::getVectors(const string &words, vector<string> &vc, int type)
 {
 	string currWord;
@@ -320,7 +331,7 @@ void testCase::getVectors(const string &words, vector<string> &vc, int type)
 	{
 		double standby;
 		if (type == ONEHOT) { standby = 1; }
-		else if (type == TERMFREQ) { standby = 1 / number_of_words; }
+		else if (type == TERMFREQ) { standby = 1.0 / number_of_words; }
 
 		int location = find_word_in_vc(currWord, vc);
 		if (location != -1)
@@ -335,7 +346,7 @@ void testCase::getVectors(const string &words, vector<string> &vc, int type)
 }
 
 //返回测试数据和一个训练数据之间的距离,-1为余弦相似度
-double testCase::distCnt(bool *trainRow, int dictSize, double distType)
+double testCase::distCnt(double *trainRow, int dictSize, double distType)
 {
 	double dist = 0;
 	if (distType != -1)
@@ -467,7 +478,7 @@ double* testCase::RG(int k, trainCase& TC, int norm_type)
 		{
 			for (int j = 0; j < 6; j++)
 			{
-				testEmo[j] += TC.matrix[it->second].emotion[j]*weight[i];
+				testEmo[j] += TC.matrix[it->second]->emotion[j]*weight[i];
 			}	
 			
 			it++;
@@ -509,12 +520,12 @@ void validHandle(ostream &os, const string &infilename, trainCase &traincase, in
 		istringstream iss1(s);
 		getline(iss1, words, ',');
 
-		testCase testcase(traincase.dictSize);
+		testCase testcase(words, traincase.dictSize);
 		testcase.getVectors(words, traincase.wordsVC, matrix_type);
 
 		for (int i = 0; i < traincase.rowCnt; i++)
 		{
-			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, dist_type);
+			 double dist = testcase.distCnt(traincase.matrix[i]->data, traincase.dictSize, dist_type);
 			testcase.setDistPairs(i, dist);
 		}
 
@@ -530,8 +541,8 @@ void validHandle(ostream &os, const string &infilename, trainCase &traincase, in
 		}
 		os << endl;
 		delete[] ansEmotion;
-		testcase.printPairs();
-		system("pause");
+		//testcase.printPairs();
+		//system("pause");
 	}
 }
 void testHandle(ostream &os, const string &infilename, trainCase &traincase, int k, int matrix_type, int dist_type, int norm_type)
@@ -550,12 +561,12 @@ void testHandle(ostream &os, const string &infilename, trainCase &traincase, int
 		getline(iss1, words, ',');//去掉数字
 		getline(iss1, words, ',');
 
-		testCase testcase(traincase.dictSize);
+		testCase testcase(words,traincase.dictSize);
 		testcase.getVectors(words, traincase.wordsVC, matrix_type);
 
 		for (int i = 0; i < traincase.rowCnt; i++)
 		{
-			double dist = testcase.distCnt(traincase.matrix[i].onehot, traincase.dictSize, dist_type);
+			double dist = testcase.distCnt(traincase.matrix[i]->data, traincase.dictSize, dist_type);
 			testcase.setDistPairs(i, dist);
 		}
 
@@ -574,10 +585,6 @@ void testHandle(ostream &os, const string &infilename, trainCase &traincase, int
 
 int main()
 {
-	trainCase TC("train_set.csv");
-	string validfile = "validation_set.csv";
-	string testfile = "test_set.csv";
-
 	//user guide
 	int start, end, matrix_type, dist_type, norm_type = 0;
 	cout << "what kind of matrix? 0 for onehot, 1 for TF." << endl;
@@ -598,6 +605,11 @@ int main()
 	cout << "end?" << endl;
 	cin >> end;
 
+	trainCase TC("train_set.csv", matrix_type);
+	string validfile = "validation_set.csv";
+	string testfile = "test_set.csv";
+	//ofstream fout("debug_train_matrix.txt");//debug
+	//fout << TC;//debug
 	for (int k = start; k < end; k++)
 	{
 		string resfile;
